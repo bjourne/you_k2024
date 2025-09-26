@@ -3,10 +3,6 @@
 
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
-# --------------------------------------------------------
-# References:
-# DeiT: https://github.com/facebookresearch/deit
-# --------------------------------------------------------
 
 import os
 import PIL
@@ -21,17 +17,24 @@ def build_dataset(is_train, args):
     transform = build_transform(is_train, args)
 
     if args.dataset == "imagenet":
-        root = os.path.join(args.data_path, 'train' if is_train else 'val')
+        root = os.path.join(
+            args.data_path, 'train' if is_train else 'val'
+        )
         dataset = datasets.ImageFolder(root, transform=transform)
     elif args.dataset == "cifar100":
-        dataset = CIFAR100(root=args.data_path, train=True if is_train else False, download=True, transform=transform)
+        dataset = CIFAR100(
+            root=args.data_path, train=True if is_train else False,
+            download=True, transform=transform
+        )
     elif args.dataset == "cifar10":
-        dataset = CIFAR10(root=args.data_path, train=True if is_train else False, download=True, transform=transform)
+        dataset = CIFAR10(
+            root=args.data_path, train=True if is_train else False,
+            download=True, transform=transform
+        )
     else:
         raise NotImplementedError
 
     print(dataset)
-
     return dataset
 
 

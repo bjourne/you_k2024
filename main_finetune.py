@@ -10,6 +10,7 @@ import numpy as np
 import os
 import time
 from pathlib import Path
+from os.path import join
 
 import torch
 import torch.nn as nn
@@ -17,8 +18,6 @@ import torch.backends.cudnn as cudnn
 from torch.utils.tensorboard import SummaryWriter
 
 import timm
-
-#assert timm.__version__ == "0.3.2" # version check
 
 # Doesn't work with latest timm
 from timm.models.layers import trunc_normal_
@@ -56,9 +55,13 @@ def get_args_parser():
         default=64, type=int,
         help='Batch size per GPU (effective batch size is batch_size * accum_iter * # gpus'
     )
-    parser.add_argument('--epochs', default=50, type=int)
-    parser.add_argument('--print_freq', default=1000, type=int,
-                        help='print_frequency')
+    parser.add_argument(
+        '--epochs', default=50, type=int
+    )
+    parser.add_argument(
+        '--print_freq', default=1000, type=int,
+        help='print_frequency'
+    )
     parser.add_argument(
         '--accum_iter', default=1, type=int,
         help='Accumulate gradient iterations '
@@ -154,13 +157,23 @@ def get_args_parser():
                         help='Use class token instead of global pool for classification')
 
     # Dataset parameters
-    parser.add_argument('--dataset', default='imagenet', type=str,
-                        help='dataset name')
-    parser.add_argument('--data_path', default='/datasets01/imagenet_full_size/061417/', type=str,
-                        help='dataset path')
-    parser.add_argument('--nb_classes', default=1000, type=int,
-                        help='number of the classification types')
-    parser.add_argument('--define_params', action='store_true')
+    parser.add_argument(
+        '--dataset', default='imagenet', type=str,
+        help='dataset name'
+    )
+    parser.add_argument(
+        '--data_path',
+        default='/datasets01/imagenet_full_size/061417/',
+        type=str,
+        help='dataset path'
+    )
+    parser.add_argument(
+        '--nb_classes', default=1000, type=int,
+        help='number of the classification types'
+    )
+    parser.add_argument(
+        '--define_params', action='store_true'
+    )
     parser.add_argument('--mean', nargs='+', type=float)
     parser.add_argument('--std', nargs='+', type=float)
 
@@ -182,8 +195,10 @@ def get_args_parser():
                         help='Perform evaluation with energy consumption')
     parser.add_argument('--wandb', action='store_true',
                         help='Using wandb or not')
-    parser.add_argument('--dist_eval', action='store_true', default=False,
-                        help='Enabling distributed evaluation (recommended during training for faster monitor')
+    parser.add_argument(
+        '--dist_eval', action='store_true', default=False,
+        help='Enabling distributed evaluation (recommended during training for faster monitor'
+    )
     parser.add_argument('--num_workers', default=32, type=int)
     parser.add_argument('--pin_mem', action='store_true',
                         help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
@@ -253,7 +268,7 @@ def main(args):
     dataset_train = build_dataset(is_train=True, args=args)
     dataset_val = build_dataset(is_train=False, args=args)
 
-    if True:  # args.distributed:
+    if True:
         num_tasks = misc.get_world_size()
         global_rank = misc.get_rank()
         sampler_train = torch.utils.data.DistributedSampler(
@@ -275,8 +290,13 @@ def main(args):
 
     if global_rank == 0 and args.log_dir is not None:
         os.makedirs(args.log_dir, exist_ok=True)
-        args.log_dir = os.path.join(args.log_dir,
-                                    "{}_{}_{}_{}_{}_act{}_weightbit{}".format(args.project_name, args.model, args.dataset, args.act_layer, args.mode, args.level,args.weight_quantization_bit))
+        args.log_dir = join(
+            args.log_dir,
+            "{}_{}_{}_{}_{}_act{}_weightbit{}".format(
+                args.project_name, args.model, args.dataset, args.act_layer,
+                args.mode, args.level,args.weight_quantization_bit
+            )
+        )
         os.makedirs(args.log_dir, exist_ok=True)
         log_writer = SummaryWriter(log_dir=args.log_dir)
         if args.wandb:
@@ -366,6 +386,7 @@ def main(args):
         # manually initialize fc layer
         trunc_normal_(model.head.weight, std=2e-5)
 
+    args.rank = 0
     if args.rank == 0:
         print("======================== ANN model ========================")
         f = open(f"{args.log_dir}/ann_model_arch.txt","w+")
@@ -505,13 +526,10 @@ def main(args):
             print(f"Time cost: {t_cost} min")
         else:
             test_stats = evaluate(data_loader_val, model, device, args)
-        # print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
-        # for k, v in test_stats.items():
-        #     print(k, v)
             if args.mode == "SNN" and misc.is_main_process():
                 for k, v in test_stats.items():
                     print(k, v)
-                with open(os.path.join(args.output_dir, "results.json"), 'w') as f:
+                with open(join(args.output_dir, "results.json"), 'w') as f:
                     json.dump(test_stats, f)
         exit(0)
 
@@ -559,7 +577,7 @@ def main(args):
         if args.output_dir and misc.is_main_process():
             if log_writer is not None:
                 log_writer.flush()
-            with open(os.path.join(args.output_dir, "log.txt"), mode="a", encoding="utf-8") as f:
+            with open(join(args.output_dir, "log.txt"), mode="a", encoding="utf-8") as f:
                 f.write(json.dumps(log_stats) + "\n")
 
     total_time = time.time() - start_time
@@ -572,8 +590,13 @@ if __name__ == '__main__':
     args = args.parse_args()
     if args.output_dir:
         Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-        args.output_dir = os.path.join(args.output_dir,
-                                       "{}_{}_{}_{}_{}_act{}_weightbit{}".format(args.project_name, args.model, args.dataset, args.act_layer, args.mode, args.level,args.weight_quantization_bit))
+        args.output_dir = join(
+            args.output_dir,
+            "{}_{}_{}_{}_{}_act{}_weightbit{}".format(
+                args.project_name, args.model, args.dataset,
+                args.act_layer, args.mode, args.level,args.weight_quantization_bit
+            )
+        )
         Path(args.output_dir).mkdir(parents=True, exist_ok=True)
         print(args.output_dir)
     main(args)
