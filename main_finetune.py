@@ -1,15 +1,9 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
-
+#
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 # --------------------------------------------------------
-# References:
-# DeiT: https://github.com/facebookresearch/deit
-# BEiT: https://github.com/microsoft/unilm/tree/master/beit
-# --------------------------------------------------------
-
-import argparse
 import datetime
 import json
 import numpy as np
@@ -24,7 +18,9 @@ from torch.utils.tensorboard import SummaryWriter
 
 import timm
 
-assert timm.__version__ == "0.3.2" # version check
+#assert timm.__version__ == "0.3.2" # version check
+
+# Doesn't work with latest timm
 from timm.models.layers import trunc_normal_
 from timm.data.mixup import Mixup
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
@@ -45,24 +41,37 @@ import warnings
 from functools import partial
 from copy import deepcopy
 
+from argparse import ArgumentParser
+
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
 def get_args_parser():
-    parser = argparse.ArgumentParser('MAE fine-tuning for image classification', add_help=False)
-    parser.add_argument('--batch_size', default=64, type=int,
-                        help='Batch size per GPU (effective batch size is batch_size * accum_iter * # gpus')
+    parser = ArgumentParser(
+        'MAE fine-tuning for image classification',
+        add_help=False
+    )
+    parser.add_argument(
+        '--batch_size',
+        default=64, type=int,
+        help='Batch size per GPU (effective batch size is batch_size * accum_iter * # gpus'
+    )
     parser.add_argument('--epochs', default=50, type=int)
     parser.add_argument('--print_freq', default=1000, type=int,
                         help='print_frequency')
-    parser.add_argument('--accum_iter', default=1, type=int,
-                        help='Accumulate gradient iterations (for increasing the effective batch size under memory constraints)')
+    parser.add_argument(
+        '--accum_iter', default=1, type=int,
+        help='Accumulate gradient iterations '
+        '(for increasing the effective batch size under memory constraints)'
+    )
     parser.add_argument('--project_name', default='T-SNN', type=str, metavar='MODEL',
                         help='Name of model to train')
 
     # Model parameters
-    parser.add_argument('--model', default='vit_large_patch16', type=str, metavar='MODEL',
-                        help='Name of model to train')
+    parser.add_argument(
+        '--model', default='vit_large_patch16', type=str, metavar='MODEL',
+        help='Name of model to train'
+    )
 
     parser.add_argument('--input_size', default=224, type=int,
                         help='images input size')
@@ -76,19 +85,25 @@ def get_args_parser():
                         help='Dropout rate')
 
     # Optimizer parameters
-    parser.add_argument('--clip_grad', type=float, default=None, metavar='NORM',
-                        help='Clip gradient norm (default: None, no clipping)')
+    parser.add_argument(
+        '--clip_grad', type=float, default=None, metavar='NORM',
+        help='Clip gradient norm (default: None, no clipping)'
+    )
     parser.add_argument('--weight_decay', type=float, default=0.05,
                         help='weight decay (default: 0.05)')
 
-    parser.add_argument('--lr', type=float, default=None, metavar='LR',
-                        help='learning rate (absolute lr)')
+    parser.add_argument(
+        '--lr', type=float, default=None, metavar='LR',
+        help='learning rate (absolute lr)'
+    )
     parser.add_argument('--blr', type=float, default=1e-3, metavar='LR',
                         help='base learning rate: absolute_lr = base_lr * total_batch_size / 256')
     parser.add_argument('--layer_decay', type=float, default=0.75,
                         help='layer-wise lr decay from ELECTRA/BEiT')
-    parser.add_argument('--act_layer', type=str, default="relu",
-                        help='Using ReLU or GELU as activation')
+    parser.add_argument(
+        '--act_layer', type=str, default="relu",
+        help='Using ReLU or GELU as activation'
+    )
 
     parser.add_argument('--min_lr', type=float, default=1e-6, metavar='LR',
                         help='lower lr bound for cyclic schedulers that hit 0')
@@ -99,8 +114,10 @@ def get_args_parser():
     # Augmentation parameters
     parser.add_argument('--color_jitter', type=float, default=None, metavar='PCT',
                         help='Color jitter factor (enabled only when not using Auto/RandAug)')
-    parser.add_argument('--aa', type=str, default='rand-m9-mstd0.5-inc1', metavar='NAME',
-                        help='Use AutoAugment policy. "v0" or "original". " + "(default: rand-m9-mstd0.5-inc1)'),
+    parser.add_argument(
+        '--aa', type=str, default='rand-m9-mstd0.5-inc1', metavar='NAME',
+        help='Use AutoAugment policy. "v0" or "original". " + "(default: rand-m9-mstd0.5-inc1)'
+    ),
     parser.add_argument('--smoothing', type=float, default=0.1,
                         help='Label smoothing (default: 0.1)')
 
@@ -180,7 +197,7 @@ def get_args_parser():
     parser.add_argument('--dist_on_itp', action='store_true')
     parser.add_argument('--dist_url', default='env://',
                         help='url used to set up distributed training')
-    
+
     # training mode
     parser.add_argument('--mode', default="ANN", type=str,
                         help='the running mode of the script["ANN", "QANN_PTQ", "QANN_QAT", "SNN"]')
@@ -191,11 +208,13 @@ def get_args_parser():
     parser.add_argument('--level', default=32, type=int,
                         help='the quantization levels')
     parser.add_argument('--weight_quantization_bit', default=32, type=int, help="the weight quantization bit")
-    parser.add_argument('--neuron_type', default="ST-BIF", type=str,
-                        help='neuron type["ST-BIF", "IF"]')
+    parser.add_argument(
+        '--neuron_type', default="ST-BIF", type=str,
+        help='neuron type["ST-BIF", "IF"]'
+    )
     parser.add_argument('--remove_softmax', action='store_true',
                         help='need softmax or not')
-    
+
     return parser
 
 def set_sparsity_weight(model):
@@ -205,7 +224,7 @@ def set_sparsity_weight(model):
                 m[0].weight.data = m[0].weight_mask
             elif isinstance(m,torch.nn.Linear):
                 m.weight.data = m.weight_mask
-    
+
 def cal_sparsity(model):
     zero_number = 0
     total_bumber = 0
@@ -406,26 +425,30 @@ def main(args):
             f.write(str(model))
             f.close()
 
-        # if args.global_pool:
-        #     assert set(msg.missing_keys) == {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias'}
-        # else:
-        #     assert set(msg.missing_keys) == {'head.weight', 'head.bias'}
-
         # manually initialize fc layer
         # trunc_normal_(model.head.weight, std=2e-5)
-        model = SNNWrapper(ann_model=model, cfg=None, time_step=args.time_step, Encoding_type=args.encoding_type, level=args.level, neuron_type=args.neuron_type, model_name=args.model, is_softmax = not args.remove_softmax)
-        
+        model = SNNWrapper(
+            ann_model=model,
+            cfg=None,
+            time_step=args.time_step,
+            Encoding_type=args.encoding_type,
+            level=args.level,
+            neuron_type=args.neuron_type,
+            model_name=args.model,
+            is_softmax = not args.remove_softmax
+        )
+
         # caculate the sparsity
         if args.ratio > 0.0:
             set_sparsity_weight(model)
             cal_sparsity(model)
-        
+
         if args.rank == 0:
             print("======================== SNN model =======================")
             f = open(f"{args.log_dir}/snn_model_arch.txt","w+")
             f.write(str(model))
             f.close()
-        
+
 
     model.to(device)
 
@@ -436,7 +459,7 @@ def main(args):
     print('number of params (M): %.2f' % (n_parameters / 1.e6))
 
     eff_batch_size = args.batch_size * args.accum_iter * misc.get_world_size()
-    
+
     if args.lr is None:  # only base_lr is specified
         args.lr = args.blr * eff_batch_size / 256
 

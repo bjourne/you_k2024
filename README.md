@@ -1,16 +1,4 @@
 <p align="center">
-<img src="spikezip_logo.png" alt="spikezip_logo" width="220" align="center">
-</p>
-
-<div align="center"><h1>&nbsp;SpikeZIP-TF: Conversion is All You Need for Transformer-based SNN</h1></div>
-
-
-<p align="center">
-| <a href="http://arxiv.org/"><b>Paper</b></a> | <a href="http://arxiv.org/"><b>Blog</b></a> |
-</p>
-
-
-<p align="center">
   <a href="https://opensource.org/license/mulanpsl-2-0">
     <img src="https://img.shields.io/badge/License-MuLan_PSL_2.0-blue.svg" alt="License">
   </a>
@@ -29,12 +17,12 @@
 - [Usage](#Usage)
   - [Train](#Train)
   - [Conversion](#Conversion)
-  - [Evaluation](#Evaluation) 
+  - [Evaluation](#Evaluation)
 
 ## News
 
 - [2024/6] Code of SpikeZip-TF is released!
-- [2024/12] Code of SpikeZip-TF in NLU tasks is released! You can view the code by switching to the NLU_tasks branch !! 
+- [2024/12] Code of SpikeZip-TF in NLU tasks is released! You can view the code by switching to the NLU_tasks branch !!
 
 ## Introduction
 
@@ -156,4 +144,3 @@ CUDA_VISIBLE_DEVICES=0 python -m torch.distributed.launch --nproc_per_node=1 --m
     --dist_eval --data_path /data1/ImageNet/ --output_dir /home/kang_you/SpikeZIP_transformer/output/ --log_dir /home/kang_you/SpikeZIP_transformer/output \
     --mode "SNN" --act_layer relu --eval --energy_eval --time_step 32 --encoding_type rate --level 16 --weight_quantization_bit 32 --define_params --mean 0.5 0.5 0.5 --std 0.5 0.5 0.5
 ```
-
