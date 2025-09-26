@@ -10,6 +10,8 @@ import sys
 from timm.models.vision_transformer import Attention,Mlp,Block
 from copy import deepcopy
 
+from torch.nn import Conv2d, Dropout, LayerNorm, Linear, Module
+
 def get_subtensors(tensor,mean,std,sample_grain=255,output_num=4):
     for i in range(int(sample_grain)):
         output = (tensor/sample_grain).unsqueeze(0)
@@ -103,7 +105,7 @@ def open_dropout(model):
     children = list(model.named_children())
     for name, child in children:
         is_need = False
-        if isinstance(child, nn.Dropout):
+        if isinstance(child, Dropout):
             child.train()
             print(child)
             is_need = True
@@ -127,10 +129,10 @@ def cal_l1_loss(model):
     _cal_l1_loss(model)
     return l1_loss
 
-class SNNWrapper(nn.Module):
-    
+class SNNWrapper(Module):
+
     def __init__(self, ann_model, cfg, time_step = 2000,Encoding_type="rate",**kwargs):
-        super(SNNWrapper, self).__init__()
+        super().__init__()
         self.T = time_step
         self.cfg = cfg
         self.finish_judger = Judger()
@@ -149,8 +151,8 @@ class SNNWrapper(nn.Module):
             self.cls_token = deepcopy(self.model.cls_token.data)
 
         self._replace_weight(self.model)
-        # self.model_reset = deepcopy(self.model)        
-    
+        # self.model_reset = deepcopy(self.model)
+
     def hook_mid_feature(self):
         self.feature_list = []
         self.input_feature_list = []
@@ -159,13 +161,13 @@ class SNNWrapper(nn.Module):
             self.input_feature_list.append(input[0])
         self.model.blocks[11].norm2[1].register_forward_hook(_hook_mid_feature)
         # self.model.blocks[11].attn.attn_IF.register_forward_hook(_hook_mid_feature)
-    
+
     def get_mid_feature(self):
         self.feature_list = torch.stack(self.feature_list,dim=0)
         self.input_feature_list = torch.stack(self.input_feature_list,dim=0)
-        print("self.feature_list",self.feature_list.shape) 
-        print("self.input_feature_list",self.input_feature_list.shape) 
-            
+        print("self.feature_list",self.feature_list.shape)
+        print("self.input_feature_list",self.input_feature_list.shape)
+
     def reset(self):
         # self.model = deepcopy(self.model_reset).cuda()
         self.model.pos_embed.data = deepcopy(self.pos_embed).cuda()
@@ -173,7 +175,7 @@ class SNNWrapper(nn.Module):
         # print(self.model.pos_embed)
         # print(self.model.cls_token)
         reset_model(self)
-    
+
     def _replace_weight(self,model):
         children = list(model.named_children())
         for name, child in children:
@@ -183,17 +185,17 @@ class SNNWrapper(nn.Module):
                 attn_convert(QAttn=child,SAttn=SAttn,level=self.level,neuron_type = self.neuron_type)
                 model._modules[name] = SAttn
                 is_need = True
-            elif isinstance(child, nn.Conv2d) or isinstance(child, QuanConv2d):
+            elif isinstance(child, Conv2d) or isinstance(child, QuanConv2d):
                 model._modules[name] = LLConv2d(child,**self.kwargs)
                 is_need = True
-            elif isinstance(child, nn.Linear) or isinstance(child, QuanLinear):
+            elif isinstance(child, Linear) or isinstance(child, QuanLinear):
                 model._modules[name] = LLLinear(child,**self.kwargs)
                 is_need = True
-            elif isinstance(child, nn.LayerNorm):
+            elif isinstance(child, LayerNorm):
                 SNN_LN = Spiking_LayerNorm(child.normalized_shape[0])
                 if child.elementwise_affine:
                     SNN_LN.layernorm.weight.data = child.weight.data
-                    SNN_LN.layernorm.bias.data = child.bias.data                
+                    SNN_LN.layernorm.bias.data = child.bias.data
                 model._modules[name] = SNN_LN
                 is_need = True
             elif isinstance(child, MyQuan):
@@ -204,12 +206,12 @@ class SNNWrapper(nn.Module):
                 neurons.pos_max = child.pos_max
                 neurons.neg_min = child.neg_min
                 neurons.is_init = False
-                model._modules[name] = neurons     
+                model._modules[name] = neurons
                 is_need = True
             elif isinstance(child, nn.ReLU):
                 model._modules[name] = nn.Identity()
                 is_need = True
-            if not is_need:            
+            if not is_need:
                 self._replace_weight(child)
 
     def forward(self,x, verbose=False):
@@ -242,7 +244,7 @@ class SNNWrapper(nn.Module):
                 if count1 < x.shape[0]:
                     input = x[count1]
                 else:
-                    input = torch.zeros(x[0].shape).to(x.device)            
+                    input = torch.zeros(x[0].shape).to(x.device)
             else:
                 if count1 == 0:
                     input = x
@@ -253,11 +255,11 @@ class SNNWrapper(nn.Module):
             # else:
             #     print("No implementation of neuron type:",self.neuron_type)
             #     sys.exit(0)
-            
+
             output = self.model(input)
             # print(count1,output[0,0:100])
             # print(count1,"output",torch.abs(output.sum()))
-            
+
             if count1 == 0:
                 accu = output+0.0
             else:
@@ -293,11 +295,6 @@ def remove_softmax(model):
             reluattn.proj_drop = child.proj_drop
             is_need = True
             model._modules[name] = reluattn
-        # elif isinstance(child, nn.LayerNorm):
-        #     LN = MyBatchNorm1d(num_features = child.normalized_shape[0])
-        #     # LN.weight.data = child.weight
-        #     # LN.bias.data = child.bias
-        #     model._modules[name] = LN
         if not is_need:
             remove_softmax(child)
 
@@ -342,53 +339,29 @@ def myquan_replace(model,level,weight_bit=32, is_softmax = True):
                 print("index",cur_index,"myquan replace finish!!!!")
                 cur_index = cur_index + 1
                 is_need = True
-            # if isinstance(child, Attention):
-            #     # print(children)
-            #     qattn = QAttention(dim=child.num_heads*child.head_dim,num_heads=child.num_heads,level=level)
-            #     qattn.qkv = child.qkv
-            #     # qattn.q_norm = child.q_norm
-            #     # qattn.k_norm = child.k_norm
-            #     qattn.attn_drop = child.attn_drop
-            #     qattn.proj = child.proj
-            #     qattn.proj_drop = child.proj_drop
-            #     model._modules[name] = qattn
-            #     print("index",cur_index,"myquan replace finish!!!!")
-            #     cur_index = cur_index + 1
-            #     is_need = True
-            # elif isinstance(child,Mlp):
-            #     model._modules[name].act = nn.Sequential(MyQuan(level,sym = False),child.act)
-            #     model._modules[name].fc2 = nn.Sequential(child.fc2,MyQuan(level,sym = True))
-            #     is_need = True
             elif isinstance(child, nn.Conv2d):
                 model._modules[name] = nn.Sequential(child,MyQuan(level,sym = True))
                 is_need = True
-            # elif isinstance(child, Block):
-            #     model._modules[name].norm1 = nn.Sequential(child.norm1,MyQuan(level,sym = True))
-            #     model._modules[name].norm2 = nn.Sequential(child.norm2,MyQuan(level,sym = True))
-            #     is_need = False
             elif isinstance(child, nn.LayerNorm):
                 model._modules[name] = nn.Sequential(child,MyQuan(level,sym = True))
                 is_need = True
             if not is_need:
                 _myquan_replace(child,level)
-    
+
     def _weight_quantization(model,weight_bit):
         children = list(model.named_children())
         for name, child in children:
             is_need = False
-            if isinstance(child, nn.Conv2d):
+            if isinstance(child, Conv2d):
                 model._modules[name] = QuanConv2d(m=child,quan_w_fn=MyQuan(level = 2**weight_bit,sym=True))
                 is_need = True
-            elif isinstance(child, nn.Linear):
+            elif isinstance(child, Linear):
                 model._modules[name] = QuanLinear(m=child,quan_w_fn=MyQuan(level = 2**weight_bit,sym=True))
                 is_need = True
             if not is_need:
                 _weight_quantization(child,weight_bit)
-                
+
     get_index(model)
     _myquan_replace(model,level)
     if weight_bit < 32:
         _weight_quantization(model,weight_bit)
-
-
-

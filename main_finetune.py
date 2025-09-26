@@ -67,8 +67,10 @@ def get_args_parser():
         help='Accumulate gradient iterations '
         '(for increasing the effective batch size under memory constraints)'
     )
-    parser.add_argument('--project_name', default='T-SNN', type=str, metavar='MODEL',
-                        help='Name of model to train')
+    parser.add_argument(
+        '--project_name', default='T-SNN', type=str, metavar='MODEL',
+        help='Name of model to train'
+    )
 
     # Model parameters
     parser.add_argument(
@@ -78,10 +80,14 @@ def get_args_parser():
 
     parser.add_argument('--input_size', default=224, type=int,
                         help='images input size')
-    parser.add_argument('--encoding_type', default="analog", type=str,
-                        help='encoding type for snn')
-    parser.add_argument('--time_step', default=2000, type=int,
-                        help='time-step for snn')
+    parser.add_argument(
+        '--encoding_type', default="analog", type=str,
+        help='encoding type for snn'
+    )
+    parser.add_argument(
+        '--time_step', default=2000, type=int,
+        help='time-step for snn'
+    )
     parser.add_argument('--drop_path', type=float, default=0.1, metavar='PCT',
                         help='Drop path rate (default: 0.1)')
     parser.add_argument('--drop_rate', type=float, default=0.0, metavar='PCT',
@@ -214,8 +220,10 @@ def get_args_parser():
                         help='url used to set up distributed training')
 
     # training mode
-    parser.add_argument('--mode', default="ANN", type=str,
-                        help='the running mode of the script["ANN", "QANN_PTQ", "QANN_QAT", "SNN"]')
+    parser.add_argument(
+        '--mode', default="ANN", type=str,
+        help='the running mode of the script["ANN", "QANN_PTQ", "QANN_QAT", "SNN"]'
+    )
     # prune
     parser.add_argument('--ratio', default=0.0, type=float,
                         help='the ratio of unstructure prune')

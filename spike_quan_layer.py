@@ -7,10 +7,9 @@ from copy import deepcopy
 import numpy as np
 import scipy
 
-# torch.set_default_dtype(torch.double)
-# torch.set_default_tensor_type(torch.DoubleTensor)
+from torch.nn import Conv2d, Linear, Module, Parameter
 
-class ORIIFNeuron(nn.Module):
+class ORIIFNeuron(Module):
     def __init__(self,q_threshold,level,sym=False):
         super(ORIIFNeuron,self).__init__()
         self.q = 0.0
@@ -18,17 +17,14 @@ class ORIIFNeuron(nn.Module):
         self.q_threshold = q_threshold
         self.is_work = False
         self.cur_output = 0.0
-        # self.steps = torch.tensor(3.0) 
+        # self.steps = torch.tensor(3.0)
         self.level = torch.tensor(level)
         self.sym = sym
         self.pos_max = torch.tensor(level - 1)
         self.neg_min = torch.tensor(0)
-            
+
         self.eps = 0
 
-    # def __repr__(self):
-    #         return f"IFNeuron(level={self.level}, sym={self.sym}, pos_max={self.pos_max}, neg_min={self.neg_min}, q_threshold={self.q_threshold})"
-    
     def reset(self):
         # print("IFNeuron reset")
         self.q = 0.0
@@ -43,14 +39,14 @@ class ORIIFNeuron(nn.Module):
         if (not torch.is_tensor(x)) and x == 0.0 and (not torch.is_tensor(self.cur_output)) and self.cur_output == 0.0:
             self.is_work = False
             return x
-        
+
         if not torch.is_tensor(self.cur_output):
             self.cur_output = torch.zeros(x.shape,dtype=x.dtype).to(x.device)
             self.acc_q = torch.zeros(x.shape,dtype=torch.float32).to(x.device)
             self.q = torch.zeros(x.shape,dtype=torch.float32).to(x.device) + 0.5
 
         self.is_work = True
-        
+
         self.q = self.q + (x.detach() if torch.is_tensor(x) else x)
         self.acc_q = torch.round(self.acc_q)
 
@@ -68,9 +64,9 @@ class ORIIFNeuron(nn.Module):
         # print((x == 0).all(), (self.cur_output==0).all())
         if (x == 0).all() and (self.cur_output==0).all():
             self.is_work = False
-        
+
         # print("self.cur_output",self.cur_output)
-        
+
         return self.cur_output*self.q_threshold
 
 
@@ -82,7 +78,7 @@ class IFNeuron(nn.Module):
         self.q_threshold = q_threshold
         self.is_work = False
         self.cur_output = 0.0
-        # self.steps = torch.tensor(3.0) 
+        # self.steps = torch.tensor(3.0)
         self.level = torch.tensor(level)
         self.sym = sym
         if sym:
@@ -91,12 +87,12 @@ class IFNeuron(nn.Module):
         else:
             self.pos_max = torch.tensor(level - 1)
             self.neg_min = torch.tensor(0)
-            
+
         self.eps = 0
 
     # def __repr__(self):
     #         return f"IFNeuron(level={self.level}, sym={self.sym}, pos_max={self.pos_max}, neg_min={self.neg_min}, q_threshold={self.q_threshold})"
-    
+
     def reset(self):
         # print("IFNeuron reset")
         self.q = 0.0
@@ -111,14 +107,14 @@ class IFNeuron(nn.Module):
         if (not torch.is_tensor(x)) and x == 0.0 and (not torch.is_tensor(self.cur_output)) and self.cur_output == 0.0:
             self.is_work = False
             return x*self.q_threshold
-        
+
         if not torch.is_tensor(self.cur_output):
             self.cur_output = torch.zeros(x.shape,dtype=x.dtype).to(x.device)
             self.acc_q = torch.zeros(x.shape,dtype=torch.float32).to(x.device)
             self.q = torch.zeros(x.shape,dtype=torch.float32).to(x.device) + 0.5
 
         self.is_work = True
-        
+
         self.q = self.q + (x.detach() if torch.is_tensor(x) else x)
         self.acc_q = torch.round(self.acc_q)
 
@@ -136,9 +132,9 @@ class IFNeuron(nn.Module):
         # print((x == 0).all(), (self.cur_output==0).all())
         if (x == 0).all() and (self.cur_output==0).all():
             self.is_work = False
-        
+
         # print("self.cur_output",self.cur_output)
-        
+
         return self.cur_output*self.q_threshold
 
 
@@ -153,7 +149,7 @@ class Spiking_LayerNorm(nn.Module):
         # print("Spiking_LayerNorm reset")
         self.X = 0.0
         self.Y_pre = None
-        
+
     def forward(self,input):
         self.X = self.X + input
         Y = self.layernorm(self.X)
@@ -169,12 +165,12 @@ class spiking_softmax(nn.Module):
         super(spiking_softmax, self).__init__()
         self.X = 0.0
         self.Y_pre = 0.0
-    
+
     def reset(self):
         # print("spiking_softmax reset")
         self.X = 0.0
-        self.Y_pre = 0.0        
-    
+        self.Y_pre = 0.0
+
     def forward(self, input):
         self.X = input + self.X
         Y = F.softmax(self.X,dim=-1)
@@ -485,7 +481,7 @@ class QAttention(nn.Module):
         self.proj_drop = nn.Dropout(proj_drop)
         self.attn_quan = MyQuan(self.level,sym=False)
         self.after_attn_quan = MyQuan(self.level,sym=True)
-        
+
     def forward(self, x):
         B, N, C = x.shape
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
@@ -502,7 +498,7 @@ class QAttention(nn.Module):
         else:
             # print("no softmax!!!!")
             attn = self.attn_quan(attn)/N
-        
+
         attn = self.attn_drop(attn)
         x = attn @ v
         x = self.after_attn_quan(x)
@@ -534,7 +530,7 @@ class SAttention(nn.Module):
             neuron_layer = IFNeuron,
             level = 2,
             is_softmax = True
-            
+
     ):
         super().__init__()
         assert dim % num_heads == 0, 'dim should be divisible by num_heads'
@@ -583,7 +579,7 @@ class SAttention(nn.Module):
         q = self.q_IF(q)
         k = self.k_IF(k)
         v = self.v_IF(v)
-        
+
         q = q * self.scale
         q_acc = self.q_IF.acc_q * self.scale * self.q_IF.q_threshold
         attn = multi(q,k,q_acc.float(),(self.k_IF.acc_q*self.k_IF.q_threshold).float())
@@ -620,9 +616,9 @@ class SpikeMaxPooling(nn.Module):
     def __init__(self,maxpool):
         super(SpikeMaxPooling,self).__init__()
         self.maxpool = maxpool
-        
+
         self.accumulation = None
-    
+
     def reset(self):
         self.accumulation = None
 
@@ -632,7 +628,7 @@ class SpikeMaxPooling(nn.Module):
             self.accumulation = x
         else:
             self.accumulation = self.accumulation + x
-        
+
         if old_accu is None:
             output = self.maxpool(self.accumulation)
         else:
@@ -640,26 +636,27 @@ class SpikeMaxPooling(nn.Module):
 
         # print("output.shape",output.shape)
         # print(output[0][0][0:4][0:4])
-        
+
         return output
 
 
-class QuanConv2d(torch.nn.Conv2d):
-    def __init__(self, m: torch.nn.Conv2d, quan_w_fn=None):
-        assert type(m) == torch.nn.Conv2d
-        super().__init__(m.in_channels, m.out_channels, m.kernel_size,
-                         stride=m.stride,
-                         padding=m.padding,
-                         dilation=m.dilation,
-                         groups=m.groups,
-                         bias=True if m.bias is not None else False,
-                         padding_mode=m.padding_mode)
+class QuanConv2d(Conv2d):
+    def __init__(self, m: Conv2d, quan_w_fn=None):
+        assert type(m) == Conv2d
+        super().__init__(
+            m.in_channels, m.out_channels, m.kernel_size,
+            stride=m.stride,
+            padding=m.padding,
+            dilation=m.dilation,
+            groups=m.groups,
+            bias=True if m.bias is not None else False,
+            padding_mode=m.padding_mode
+        )
         self.quan_w_fn = quan_w_fn
 
-        self.weight = torch.nn.Parameter(m.weight.detach())
-        # self.quan_w_fn.init_from(m.weight)
+        self.weight = Parameter(m.weight.detach())
         if m.bias is not None:
-            self.bias = torch.nn.Parameter(m.bias.detach())
+            self.bias = Parameter(m.bias.detach())
         else:
             self.bias = None
 
@@ -668,26 +665,26 @@ class QuanConv2d(torch.nn.Conv2d):
         return self._conv_forward(x, quantized_weight,self.bias)
 
 
-class QuanLinear(torch.nn.Linear):
-    def __init__(self, m: torch.nn.Linear, quan_w_fn=None):
-        assert type(m) == torch.nn.Linear
+class QuanLinear(Linear):
+    def __init__(self, m: Linear, quan_w_fn=None):
+        assert type(m) == Linear
         super().__init__(m.in_features, m.out_features,
                          bias=True if m.bias is not None else False)
         self.quan_w_fn = quan_w_fn
 
-        self.weight = torch.nn.Parameter(m.weight.detach())
+        self.weight = Parameter(m.weight.detach())
         # self.quan_w_fn.init_from(m.weight)
         if m.bias is not None:
-            self.bias = torch.nn.Parameter(m.bias.detach())
+            self.bias = Parameter(m.bias.detach())
 
     def forward(self, x):
         quantized_weight = self.quan_w_fn(self.weight)
         return torch.nn.functional.linear(x, quantized_weight, self.bias)
 
 
-class LLConv2d(nn.Module):
+class LLConv2d(Module):
     def __init__(self,conv,**kwargs):
-        super(LLConv2d,self).__init__()
+        super().__init__()
         self.conv = conv
         self.is_work = False
         self.first = True
@@ -696,8 +693,8 @@ class LLConv2d(nn.Module):
         self.level = kwargs["level"]
         self.steps = 1
         self.realize_time = self.steps
-        
-        
+
+
     def reset(self):
         # print("LLConv2d reset")
         self.is_work = False
@@ -706,7 +703,6 @@ class LLConv2d(nn.Module):
         self.realize_time = self.steps
 
     def forward(self,input):
-        # print("LLConv2d.steps",self.steps)
         x = input
         N,C,H,W = x.shape
         F_h,F_w = self.conv.kernel_size
@@ -744,14 +740,14 @@ class LLConv2d(nn.Module):
                     output = output + (self.conv.bias.data.unsqueeze(0).unsqueeze(-1).unsqueeze(-1)/self.steps if self.conv.bias is not None else 0.0)
                     self.realize_time = self.realize_time - 1
                     # print("conv2d self.realize_time",self.realize_time)
-                    
+
 
         self.is_work = True
         self.first = False
 
         return output
 
-class LLLinear(nn.Module):
+class LLLinear(Module):
     def __init__(self,linear,**kwargs):
         super(LLLinear,self).__init__()
         self.linear = linear
@@ -770,7 +766,6 @@ class LLLinear(nn.Module):
         self.realize_time = self.steps
 
     def forward(self,input):
-        # print("LLLinear.steps",self.steps)
         x = input
         # if x.ndim == 2:
         #     B,N = x.shape
@@ -817,7 +812,7 @@ class LLLinear(nn.Module):
         return output
 
 
-class Attention_no_softmax(nn.Module):
+class Attention_no_softmax(Module):
     def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.):
         super().__init__()
         self.num_heads = num_heads
@@ -850,41 +845,38 @@ class Attention_no_softmax(nn.Module):
 class MyBatchNorm1d(nn.BatchNorm1d):
     def __init__(self, **kwargs):
         super(MyBatchNorm1d, self).__init__(**kwargs)
-    
+
     def forward(self,x):
         x = x.transpose(1,2)
         F.batch_norm(x,self.running_mean,self.running_var,self.weight,self.bias,self.training,self.momentum,self.eps)
         x = x.transpose(1,2)
         return x
-        
-    
 
-class MyLayerNorm(nn.Module):
+
+
+class MyLayerNorm(Module):
     def __init__(self, dim):
         super().__init__()
         self.dim = dim
-        self.weight = nn.Parameter(torch.zeros(self.dim))
-        self.bias = nn.Parameter(torch.zeros(self.dim))
+        self.weight = Parameter(torch.zeros(self.dim))
+        self.bias = Parameter(torch.zeros(self.dim))
         nn.init.constant_(self.weight, 1.)
-        nn.init.constant_(self.bias, 0.)      
+        nn.init.constant_(self.bias, 0.)
         self.running_mean = None
         self.running_var = None
         self.momentum = 0.1
         self.eps = 1e-6
-    
-    def forward(self,x):        
+
+    def forward(self,x):
         if self.training:
             if self.running_mean is None:
-                self.running_mean = nn.Parameter((1-self.momentum) * x.mean([0,-1], keepdim=True),requires_grad=False)
-                self.running_var = nn.Parameter((1-self.momentum) * x.std([0,-1], keepdim=True),requires_grad=False)
+                self.running_mean = Parameter((1-self.momentum) * x.mean([0,-1], keepdim=True),requires_grad=False)
+                self.running_var = Parameter((1-self.momentum) * x.std([0,-1], keepdim=True),requires_grad=False)
             else:
                 self.running_mean.data = (1-self.momentum) * x.mean([0,-1], keepdim=True) + self.momentum * self.running_mean # mean: [bsz, max_len, 1]
                 self.running_var.data = (1-self.momentum) * x.std([0,-1], keepdim=True) + self.momentum * self.running_var # std: [bsz, max_len, 1]
-            return self.weight * (x - self.running_mean) / (self.running_var + self.eps) + self.bias    
+            return self.weight * (x - self.running_mean) / (self.running_var + self.eps) + self.bias
         else:
             running_mean = self.running_mean
             running_var = self.running_var
-            return self.weight * (x - running_mean) / (running_var + self.eps) + self.bias    
-        # 注意这里也在最后一个维度发生了广播
-    
-      
+            return self.weight * (x - running_mean) / (running_var + self.eps) + self.bias
