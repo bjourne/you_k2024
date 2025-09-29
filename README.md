@@ -1,16 +1,3 @@
-<p align="center">
-  <a href="https://opensource.org/license/mulanpsl-2-0">
-    <img src="https://img.shields.io/badge/License-MuLan_PSL_2.0-blue.svg" alt="License">
-  </a>
-  <a href="https://github.com/">
-    <img src="https://img.shields.io/badge/Maintained%3F-yes-green.svg" alt="Maintenance">
-  </a>
-  <a href="https://github.com/">
-    <img src="https://img.shields.io/badge/Contributions-welcome-brightgreen.svg?style=flat" alt="Contributions welcome">
-  </a>
-</p>
-
-
 ## Contents
 - [News](#news)
 - [Introduction](#introduction)
@@ -18,28 +5,6 @@
   - [Train](#Train)
   - [Conversion](#Conversion)
   - [Evaluation](#Evaluation)
-
-## News
-
-- [2024/6] Code of SpikeZip-TF is released!
-- [2024/12] Code of SpikeZip-TF in NLU tasks is released! You can view the code by switching to the NLU_tasks branch !!
-
-## Introduction
-
-![image](https://github.com/Intelligent-Computing-Research-Group/SpikeZIP_transformer/assets/74498528/91609adb-56f2-49e1-92fe-9596b38cb9f4)
-
-
-This is the official project repository for the following paper. If you find this repository helpful, Please kindly cite:
-```
-@inproceedings{
-spikeziptf2024,
-title={SpikeZIP-TF: Conversion is All You Need for Transformer-based SNN},
-author={You, Kang= and Xu, Zekai= and Nie, Chen and Deng, Zhijie and Wang, Xiang and Guo, Qinghai and He, Zhezhi},
-booktitle={Forty-first International Conference on Machine Learning (ICML)},
-year={2024}
-}
-```
-:fire: =: indicates equal contribution.
 
 ## Usage
 

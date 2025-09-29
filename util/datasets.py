@@ -7,6 +7,7 @@
 import os
 import PIL
 
+from os.path import join
 from torchvision import datasets, transforms
 from torchvision.datasets import CIFAR10, CIFAR100
 from timm.data import create_transform
@@ -16,20 +17,23 @@ from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 def build_dataset(is_train, args):
     transform = build_transform(is_train, args)
 
+    mode = 'train' if is_train else 'val'
     if args.dataset == "imagenet":
-        root = os.path.join(
-            args.data_path, 'train' if is_train else 'val'
-        )
+        root = join(args.data_path, mode)
         dataset = datasets.ImageFolder(root, transform=transform)
     elif args.dataset == "cifar100":
         dataset = CIFAR100(
-            root=args.data_path, train=True if is_train else False,
-            download=True, transform=transform
+            root=args.data_path,
+            train=is_train,
+            download=True,
+            transform=transform
         )
     elif args.dataset == "cifar10":
         dataset = CIFAR10(
-            root=args.data_path, train=True if is_train else False,
-            download=True, transform=transform
+            root=args.data_path,
+            train=is_train,
+            download=True,
+            transform=transform
         )
     else:
         raise NotImplementedError

@@ -9,13 +9,15 @@
 # BEiT: https://github.com/microsoft/unilm/tree/master/beit
 # --------------------------------------------------------
 
-import argparse
 import datetime
 import json
 import numpy as np
 import os
 import time
 from pathlib import Path
+
+from argparse import ArgumentParser
+from torch.utils.data import DataLoader
 
 import torch
 import torch.nn as nn
@@ -24,7 +26,6 @@ from torch.utils.tensorboard import SummaryWriter
 from functools import partial
 import timm
 
-assert timm.__version__ == "0.3.2"  # version check
 from timm.models.layers import trunc_normal_
 from timm.data.mixup import Mixup
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
@@ -47,16 +48,22 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 
 def get_args_parser():
-    parser = argparse.ArgumentParser('MAE fine-tuning for image classification', add_help=False)
-    parser.add_argument('--batch_size', default=64, type=int,
-                        help='Batch size per GPU (effective batch size is batch_size * accum_iter * # gpus')
+    parser = ArgumentParser('MAE fine-tuning for image classification', add_help=False)
+    parser.add_argument(
+        '--batch_size', default=64, type=int,
+        help='Batch size per GPU (effective batch size is batch_size * accum_iter * # gpus'
+    )
     parser.add_argument('--epochs', default=50, type=int)
     parser.add_argument('--print_freq', default=1000, type=int,
                         help='print_frequency')
-    parser.add_argument('--accum_iter', default=1, type=int,
-                        help='Accumulate gradient iterations (for increasing the effective batch size under memory constraints)')
-    parser.add_argument('--project_name', default='T-SNN', type=str, metavar='MODEL',
-                        help='Name of model to train')
+    parser.add_argument(
+        '--accum_iter', default=1, type=int,
+        help='Accumulate gradient iterations (for increasing the effective batch size under memory constraints)'
+    )
+    parser.add_argument(
+        '--project_name', default='T-SNN', type=str, metavar='MODEL',
+        help='Name of model to train'
+    )
 
     # Model parameters
     parser.add_argument('--model', default='vit_small_patch16', type=str, metavar='MODEL',
@@ -103,8 +110,10 @@ def get_args_parser():
     # Augmentation parameters
     parser.add_argument('--color_jitter', type=float, default=None, metavar='PCT',
                         help='Color jitter factor (enabled only when not using Auto/RandAug)')
-    parser.add_argument('--aa', type=str, default='rand-m9-mstd0.5-inc1', metavar='NAME',
-                        help='Use AutoAugment policy. "v0" or "original". " + "(default: rand-m9-mstd0.5-inc1)'),
+    parser.add_argument(
+        '--aa', type=str, default='rand-m9-mstd0.5-inc1', metavar='NAME',
+        help='Use AutoAugment policy. "v0" or "original". " + "(default: rand-m9-mstd0.5-inc1)'
+    )
     parser.add_argument('--smoothing', type=float, default=0.1,
                         help='Label smoothing (default: 0.1)')
 
@@ -135,18 +144,28 @@ def get_args_parser():
     # * Finetuning params
     parser.add_argument('--finetune', default='',
                         help='finetune from checkpoint')
-    parser.add_argument('--pretrain_teacher', default='',
-                        help='pretrained teacher model')
+    parser.add_argument(
+        '--pretrain_teacher', default='',
+        help='pretrained teacher model'
+    )
     parser.add_argument('--global_pool', action='store_true')
     parser.set_defaults(global_pool=False)
-    parser.add_argument('--cls_token', action='store_false', dest='global_pool',
-                        help='Use class token instead of global pool for classification')
+    parser.add_argument(
+        '--cls_token', action='store_false', dest='global_pool',
+        help='Use class token instead of global pool for classification'
+    )
 
     # Dataset parameters
-    parser.add_argument('--dataset', default='imagenet', type=str,
-                        help='dataset name')
-    parser.add_argument('--data_path', default='/datasets01/imagenet_full_size/061417/', type=str,
-                        help='dataset path')
+    parser.add_argument(
+        '--dataset', default='imagenet', type=str,
+        help='dataset name'
+    )
+    parser.add_argument(
+        '--data_path',
+        default='/datasets01/imagenet_full_size/061417/',
+        type=str,
+        help='dataset path'
+    )
     parser.add_argument('--nb_classes', default=1000, type=int,
                         help='number of the classification types')
     parser.add_argument('--define_params', action='store_true')
@@ -195,8 +214,10 @@ def get_args_parser():
     parser.add_argument('--weight_quantization_bit', default=32, type=int, help="the weight quantization bit")
     parser.add_argument('--neuron_type', default="ST-BIF", type=str,
                         help='neuron type["ST-BIF", "IF"]')
-    parser.add_argument('--remove_softmax', action='store_true',
-                        help='need softmax or not')
+    parser.add_argument(
+        '--remove_softmax', action='store_true',
+        help='need softmax or not'
+    )
     return parser
 
 
@@ -252,7 +273,7 @@ def main(args):
     else:
         log_writer = None
 
-    data_loader_train = torch.utils.data.DataLoader(
+    data_loader_train = DataLoader(
         dataset_train, sampler=sampler_train,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
@@ -260,7 +281,7 @@ def main(args):
         drop_last=True,
     )
 
-    data_loader_val = torch.utils.data.DataLoader(
+    data_loader_val = DataLoader(
         dataset_val, sampler=sampler_val,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
@@ -273,9 +294,15 @@ def main(args):
     if mixup_active:
         print("Mixup is activated!")
         mixup_fn = Mixup(
-            mixup_alpha=args.mixup, cutmix_alpha=args.cutmix, cutmix_minmax=args.cutmix_minmax,
-            prob=args.mixup_prob, switch_prob=args.mixup_switch_prob, mode=args.mixup_mode,
-            label_smoothing=args.smoothing, num_classes=args.nb_classes)
+            mixup_alpha=args.mixup,
+            cutmix_alpha=args.cutmix,
+            cutmix_minmax=args.cutmix_minmax,
+            prob=args.mixup_prob,
+            switch_prob=args.mixup_switch_prob,
+            mode=args.mixup_mode,
+            label_smoothing=args.smoothing,
+            num_classes=args.nb_classes
+        )
 
     if args.act_layer == "relu":
         activation = nn.ReLU
@@ -324,7 +351,12 @@ def main(args):
 
     assert args.pretrain_teacher is not None
     print("Load pre-trained teacher checkpoint from: %s" % args.pretrain_teacher)
-    checkpoint_teacher = torch.load(args.pretrain_teacher, map_location='cpu')
+    checkpoint_teacher = torch.load(
+        args.pretrain_teacher,
+        map_location='cpu',
+        weights_only=False
+    )
+    print("teacher", checkpoint_teacher)
     checkpoint_model_teacher = checkpoint_teacher if ".bin" in args.pretrain_teacher else checkpoint_teacher['model']
     state_dict_teacher = model_teacher.state_dict()
     for k in ['head.weight', 'head.bias']:
@@ -357,11 +389,6 @@ def main(args):
         msg = model.load_state_dict(checkpoint_model, strict=False)
         print(msg)
 
-        # if args.global_pool:
-        #     assert set(msg.missing_keys) == {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias'}
-        # else:
-        #     assert set(msg.missing_keys) == {'head.weight', 'head.bias'}
-
         # manually initialize fc layer
         if not args.mode == "QANN-QAT":
             trunc_normal_(model.head.weight, std=2e-5)
@@ -379,7 +406,12 @@ def main(args):
             f.write(str(model))
             f.close()
     elif args.mode == "SNN":
-        myquan_replace(model, args.level, args.weight_quantization_bit, is_softmax = not args.remove_softmax)
+        myquan_replace(
+            model,
+            args.level,
+            args.weight_quantization_bit,
+            is_softmax = not args.remove_softmax
+        )
         checkpoint = torch.load(args.finetune, map_location='cpu') if not args.eval else torch.load(args.resume,
                                                                                                     map_location='cpu')
         print("Load pre-trained checkpoint from: %s" % args.finetune)
@@ -401,11 +433,6 @@ def main(args):
             f = open(f"{args.log_dir}/qann_model_arch.txt", "w+")
             f.write(str(model))
             f.close()
-
-        # if args.global_pool:
-        #     assert set(msg.missing_keys) == {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias'}
-        # else:
-        #     assert set(msg.missing_keys) == {'head.weight', 'head.bias'}
 
         # manually initialize fc layer
         # trunc_normal_(model.head.weight, std=2e-5)

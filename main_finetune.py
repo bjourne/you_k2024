@@ -15,7 +15,7 @@ from os.path import join
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
-from torch.utils.tensorboard import SummaryWriter
+
 
 import timm
 
@@ -23,6 +23,8 @@ import timm
 from timm.models.layers import trunc_normal_
 from timm.data.mixup import Mixup
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
+from torch.nn import Conv2d, GELU, Linear, ReLU, Sequential
+from torch.utils.tensorboard import SummaryWriter
 
 import util.lr_decay as lrd
 import util.misc as misc
@@ -98,8 +100,10 @@ def get_args_parser():
         '--clip_grad', type=float, default=None, metavar='NORM',
         help='Clip gradient norm (default: None, no clipping)'
     )
-    parser.add_argument('--weight_decay', type=float, default=0.05,
-                        help='weight decay (default: 0.05)')
+    parser.add_argument(
+        '--weight_decay', type=float, default=0.05,
+        help='weight decay (default: 0.05)'
+    )
 
     parser.add_argument(
         '--lr', type=float, default=None, metavar='LR',
@@ -235,15 +239,17 @@ def get_args_parser():
         '--neuron_type', default="ST-BIF", type=str,
         help='neuron type["ST-BIF", "IF"]'
     )
-    parser.add_argument('--remove_softmax', action='store_true',
-                        help='need softmax or not')
+    parser.add_argument(
+        '--remove_softmax', action='store_true',
+        help='need softmax or not'
+    )
 
     return parser
 
 def set_sparsity_weight(model):
     for name, m in model.named_modules():
         if name.count("proj")>0 or name.count("fc2")>0:
-            if isinstance(m,torch.nn.Sequential) and isinstance(m[0],torch.nn.Linear):
+            if isinstance(m, Sequential) and isinstance(m[0], Linear):
                 m[0].weight.data = m[0].weight_mask
             elif isinstance(m,torch.nn.Linear):
                 m.weight.data = m.weight_mask
@@ -252,7 +258,7 @@ def cal_sparsity(model):
     zero_number = 0
     total_bumber = 0
     for name, m in model.named_modules():
-        if isinstance(m,torch.nn.Linear) or isinstance(m,torch.nn.Conv2d):
+        if isinstance(m, Linear) or isinstance(m, Conv2d):
             zero_number = zero_number + torch.sum(m.weight==0)
             total_bumber = total_bumber + m.weight.numel()
 
@@ -340,9 +346,9 @@ def main(args):
             label_smoothing=args.smoothing, num_classes=args.nb_classes)
 
     if args.act_layer == "relu":
-        activation = nn.ReLU
+        activation = ReLU
     elif args.act_layer == "gelu":
-        activation = nn.GELU
+        activation = GELU
     else:
         raise NotImplementedError
 
@@ -454,8 +460,6 @@ def main(args):
             f.write(str(model))
             f.close()
 
-        # manually initialize fc layer
-        # trunc_normal_(model.head.weight, std=2e-5)
         model = SNNWrapper(
             ann_model=model,
             cfg=None,

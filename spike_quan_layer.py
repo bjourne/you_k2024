@@ -26,7 +26,6 @@ class ORIIFNeuron(Module):
         self.eps = 0
 
     def reset(self):
-        # print("IFNeuron reset")
         self.q = 0.0
         self.cur_output = 0.0
         self.acc_q = 0.0
